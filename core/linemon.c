@@ -2,11 +2,13 @@
 #include <string.h>
 #include <pjsua-lib/pjsua.h>
 
+#define BUFSIZE 8000*30
+
 int run;
 
-int buf_pos;
 char *tx_buf, *rx_buf;
 FILE *tx_out, *rx_out;
+int   tx_pos,  rx_pos;
 
 #define CHECK(fn) puts(fn);
 
@@ -47,19 +49,24 @@ int main(int argc, char **argv){
   pj_status_t pj_status;
   run = 0;
   sip_init();
+
   pjsua_acc_id acc_id = sip_register("172.28.128.3", "100", "pass");
-  while(!run){sleep(1);}
 
   port_init();
 
+  while(!run){sleep(1);}
+
+
   pj_str_t uri = pj_str("sip:**1@172.28.128.3");
+
+
   pjsua_call_setting opt;
   pjsua_call_setting_default(&opt);
 
   pjsua_call_id call;
   pjsua_call_make_call(acc_id, &uri, &opt, NULL, NULL, &call);
  
-  while(1){sleep(300);}
+  sleep(60);
   return 0;
 }
 
@@ -86,7 +93,11 @@ int sip_init(){
   pjsua_transport_config_default(&transport_cfg);
   transport_cfg.port = 0;
 
-  PJ( pjsua_transport_create(PJSIP_TRANSPORT_UDP, &transport_cfg, NULL) );
+  pjsua_transport_id transport_id;
+  PJ( pjsua_transport_create(PJSIP_TRANSPORT_UDP, &transport_cfg, &transport_id) );
+
+  pjsua_acc_id local_acc_id;
+  PJ( pjsua_acc_add_local(transport_id, 1, &local_acc_id) );
 
   PJ( pjsua_set_null_snd_dev() );
   PJ( pjsua_start() );
@@ -94,13 +105,34 @@ int sip_init(){
   return 1;
 }
 
-pj_status_t put_frame(pjmedia_port *port, pjmedia_frame *frame){
-  int i=0; char *buf = (char*)frame->buf;
-  while(i++ < frame->size){
-    fputc(buf[i], rx_out);
-    fputc(tx_buf[buf_pos++], tx_out);
 
-    if(buf_pos > 8000*30)
+pj_status_t get_frame(pjmedia_port *port, pjmedia_frame *frame){
+  if(frame->type != PJMEDIA_FRAME_TYPE_AUDIO)
+    return PJ_SUCCESS;
+
+  int i = 0;
+  char *buf = (char*)frame->buf;
+  while(i < frame->size){
+    buf[i++] = tx_buf[tx_pos++];
+  }
+
+  if(tx_pos > BUFSIZE)
+    exit(0);
+
+  return PJ_SUCCESS;
+}
+
+pj_status_t put_frame(pjmedia_port *port, pjmedia_frame *frame){
+  if(frame->type != PJMEDIA_FRAME_TYPE_AUDIO)
+    return PJ_SUCCESS;
+
+  int i=0;
+  char *buf = (char*)frame->buf;
+  while(i < frame->size){
+    fputc(buf[i++], rx_out);
+    fputc(tx_buf[rx_pos++], tx_out);
+
+    if(rx_pos > BUFSIZE)
       exit(0);
   }
 
@@ -110,26 +142,31 @@ pj_status_t put_frame(pjmedia_port *port, pjmedia_frame *frame){
 int port_init(){
   pj_status_t pj_status;
 
+
   pj_pool_t *pool = pjsua_pool_create("mypool", 128, 128);
 
-  pj_size_t len = 8000*300;
-  tx_buf = malloc(sizeof(char)* len);
-  rx_buf = malloc(sizeof(char)* len);
+  tx_buf = malloc(sizeof(char) * BUFSIZE);
+  rx_buf = malloc(sizeof(char) * BUFSIZE);
 
-  int t=0; while(t++<len) tx_buf[t] = (t & (t * 16)) | t >> 7;
+  int t=0; while(t < BUFSIZE){
+    tx_buf[t+0] = 0;
+    tx_buf[t+1] = (t & (t * 16)) | t >> 7;
+    t+=2;
+  }
 
   pjmedia_port *port;
-  PJ( pjmedia_mem_player_create(pool, tx_buf, len, 8000, 1, 8000, 16, 0, &port) );
+  PJ( pjmedia_null_port_create(pool, 8000, 1, 4000, 16, &port) );
   port->put_frame = &put_frame;
+  port->get_frame = &get_frame;
 
   pjsua_conf_port_id id;
   PJ( pjsua_conf_add_port(pool, port, &id) );
-    
 
   tx_out = fopen("tx_out.raw", "w+");
   rx_out = fopen("rx_out.raw", "w+");
-  buf_pos = 0;
 
+  tx_pos = 0;
+  rx_pos = 0;
   return 1;
 }
 
