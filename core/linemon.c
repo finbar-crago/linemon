@@ -3,7 +3,10 @@
 #include <pjsua-lib/pjsua.h>
 
 int run;
-pjsua_conf_port_id pid;
+
+int buf_pos;
+char *tx_buf, *rx_buf;
+FILE *tx_out, *rx_out;
 
 #define CHECK(fn) puts(fn);
 
@@ -11,14 +14,7 @@ pjsua_conf_port_id pid;
   { printf("[%s:%d(%s)] !%s\n",__FILE__,__LINE__,__PRETTY_FUNCTION__,#fn); \
     exit(-1); }
 
-
 #define PJ(fn) pj_status = fn; if(pj_status != PJ_SUCCESS) DIE(fn)
-
-
-pj_status_t get_frame(pjmedia_port *port, pjmedia_frame *frame){
-  puts("get_frame");
-  return PJ_SUCCESS;  
-}
 
 void on_reg_state(pjsua_acc_id acc_id){
   pjsua_acc_info acc_info;
@@ -42,6 +38,7 @@ static void on_call_media_state(pjsua_call_id call_id){
   if(ci.media_status == PJSUA_CALL_MEDIA_ACTIVE){
     // FIXME: This is lazy....
     pjsua_conf_connect(1, ci.conf_slot);
+    pjsua_conf_connect(ci.conf_slot, 1);
   }
 }
 
@@ -55,7 +52,7 @@ int main(int argc, char **argv){
 
   port_init();
 
-  pj_str_t uri = pj_str("sip:101@172.28.128.3");
+  pj_str_t uri = pj_str("sip:**1@172.28.128.3");
   pjsua_call_setting opt;
   pjsua_call_setting_default(&opt);
 
@@ -97,23 +94,41 @@ int sip_init(){
   return 1;
 }
 
+pj_status_t put_frame(pjmedia_port *port, pjmedia_frame *frame){
+  int i=0; char *buf = (char*)frame->buf;
+  while(i++ < frame->size){
+    fputc(buf[i], rx_out);
+    fputc(tx_buf[buf_pos++], tx_out);
+
+    if(buf_pos > 8000*30)
+      exit(0);
+  }
+
+  return PJ_SUCCESS;
+}
+
 int port_init(){
   pj_status_t pj_status;
 
   pj_pool_t *pool = pjsua_pool_create("mypool", 128, 128);
 
   pj_size_t len = 8000*300;
-  char *buf = malloc(sizeof(char)* len);
-  int t=0; while(t++<len) buf[t] = (t & (t * 16)) | t >> 7;
+  tx_buf = malloc(sizeof(char)* len);
+  rx_buf = malloc(sizeof(char)* len);
 
-  pjmedia_port *src_port;
-  PJ( pjmedia_mem_player_create(pool, buf, len, 8000, 1, 8000, 16, 0, &src_port) );
+  int t=0; while(t++<len) tx_buf[t] = (t & (t * 16)) | t >> 7;
 
-  pjsua_conf_port_id src;
-  PJ( pjsua_conf_add_port(pool, src_port, &src) );
+  pjmedia_port *port;
+  PJ( pjmedia_mem_player_create(pool, tx_buf, len, 8000, 1, 8000, 16, 0, &port) );
+  port->put_frame = &put_frame;
+
+  pjsua_conf_port_id id;
+  PJ( pjsua_conf_add_port(pool, port, &id) );
     
-  PJ( pjsua_conf_connect(src, 0) );
-  CHECK("pjsua_conf_connect");
+
+  tx_out = fopen("tx_out.raw", "w+");
+  rx_out = fopen("rx_out.raw", "w+");
+  buf_pos = 0;
 
   return 1;
 }
