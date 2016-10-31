@@ -48,7 +48,8 @@ int main(int argc, char **argv){
     acc = sip_register(host, user, pass);
 
   port_init();
-  while(!run){sleep(1);}
+  if(user)
+    while(!run){sleep(1);}
 
   dial(acc, host, extn);
 
