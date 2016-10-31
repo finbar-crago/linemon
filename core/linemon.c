@@ -18,32 +18,6 @@ int   tx_pos,  rx_pos;
 
 #define PJ(fn) pj_status = fn; if(pj_status != PJ_SUCCESS) DIE(fn)
 
-void on_reg_state(pjsua_acc_id acc_id){
-  pjsua_acc_info acc_info;
-  pjsua_acc_get_info(acc_id, &acc_info);
-  printf("acc_info.status == %d\n", acc_info.status);
-    if(acc_info.status == PJSIP_SC_OK)
-      run = 1;
-}
-
-static void on_call_state(pjsua_call_id call_id, pjsip_event *e){
-  PJ_UNUSED_ARG(e);
-  pjsua_call_info ci;
-  pjsua_call_get_info(call_id, &ci);
-  if(ci.state == PJSIP_INV_STATE_CONNECTING){}
-  if(ci.state == PJSIP_INV_STATE_DISCONNECTED){}
-}
-
-static void on_call_media_state(pjsua_call_id call_id){
-  pjsua_call_info ci;
-  pjsua_call_get_info(call_id, &ci);
-  if(ci.media_status == PJSUA_CALL_MEDIA_ACTIVE){
-    // FIXME: This is lazy....
-    pjsua_conf_connect(1, ci.conf_slot);
-    pjsua_conf_connect(ci.conf_slot, 1);
-  }
-}
-
 
 int main(int argc, char **argv){
   pj_status_t pj_status;
@@ -68,6 +42,32 @@ int main(int argc, char **argv){
  
   sleep(60);
   return 0;
+}
+
+void on_reg_state(pjsua_acc_id acc_id){
+  pjsua_acc_info acc_info;
+  pjsua_acc_get_info(acc_id, &acc_info);
+  printf("acc_info.status == %d\n", acc_info.status);
+    if(acc_info.status == PJSIP_SC_OK)
+      run = 1;
+}
+
+static void on_call_state(pjsua_call_id call_id, pjsip_event *e){
+  PJ_UNUSED_ARG(e);
+  pjsua_call_info ci;
+  pjsua_call_get_info(call_id, &ci);
+  if(ci.state == PJSIP_INV_STATE_CONNECTING){}
+  if(ci.state == PJSIP_INV_STATE_DISCONNECTED){}
+}
+
+static void on_call_media_state(pjsua_call_id call_id){
+  pjsua_call_info ci;
+  pjsua_call_get_info(call_id, &ci);
+  if(ci.media_status == PJSUA_CALL_MEDIA_ACTIVE){
+    // FIXME: This is lazy....
+    pjsua_conf_connect(1, ci.conf_slot);
+    pjsua_conf_connect(ci.conf_slot, 1);
+  }
 }
 
 int sip_init(){
