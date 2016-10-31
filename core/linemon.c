@@ -4,8 +4,8 @@
 
 #define BUFSIZE 8000*30
 
+//TODO: Move all this to a nice struct...
 int run;
-
 char *tx_buf, *rx_buf;
 FILE *tx_out, *rx_out;
 int   tx_pos,  rx_pos;
@@ -18,18 +18,40 @@ int   tx_pos,  rx_pos;
 
 #define PJ(fn) pj_status = fn; if(pj_status != PJ_SUCCESS) DIE(fn)
 
+void usage(char *cmd){
+  printf("Usage: %s [user:[pass]@]host extn\"\n", cmd);
+  exit(-1);
+}
 
 int main(int argc, char **argv){
+  if(argc != 3) usage(argv[0]);
   pj_status_t pj_status;
+
+  char *host, *user, *pass, *extn;
+  char *ptr = strchr(argv[1],'@');
+  if(ptr){*ptr=0;ptr++;host=ptr;
+    user=argv[1];ptr=strchr(user,':');
+    if(ptr){*ptr=0;ptr++;pass=ptr;}
+    else pass=NULL;
+  } else {
+    host = argv[1];
+    user = NULL;
+    pass = NULL;
+  } extn = argv[2];
+
+
   run = 0;
   sip_init();
 
-  pjsua_acc_id acc = sip_register("172.28.128.3", "100", "pass");
+  pjsua_acc_id acc = 0;
+  if(user)
+    acc = sip_register(host, user, pass);
+
   port_init();
   while(!run){sleep(1);}
 
-  dial(acc, "sip:**1@172.28.128.3");
- 
+  dial(acc, host, extn);
+
   while(run){sleep(1);}
   pjsua_destroy();
   close(tx_out);
@@ -165,8 +187,11 @@ int port_init(){
   return 1;
 }
 
-pjsua_call_id dial(pjsua_acc_id acc_id, char *to){
-  pj_str_t uri = pj_str(to);
+pjsua_call_id dial(pjsua_acc_id acc_id, char *host, char *extn){
+  if(strlen(host)+strlen(extn) > 250) DIE(host+extn > 250);
+  char *c_uri = malloc(256);
+  sprintf(c_uri, "sip:%s@%s", extn, host);
+  pj_str_t uri = pj_str(c_uri);
 
   pjsua_call_setting opt;
   pjsua_call_setting_default(&opt);
@@ -179,11 +204,11 @@ pjsua_call_id dial(pjsua_acc_id acc_id, char *to){
 
 pjsua_acc_id sip_register(char *host, char *user, char *pass){
   pj_status_t pj_status;
-  if(strlen(user)+strlen(host) > 58)
-    DIE(user+host > 58);
+  if(strlen(user)+strlen(host) > 250)
+    DIE(user+host > 250);
 
-  char *id = malloc(64);
-  char *uri= malloc(64);
+  char *id = malloc(256);
+  char *uri= malloc(256);
   sprintf(id, "sip:%s@%s", user, host);
   sprintf(uri,"sip:%s", host);
 
