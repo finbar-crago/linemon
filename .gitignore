@@ -1,6 +1,10 @@
 *~
 *#
 
+*.raw
+*.wav
+*.png
+
 # C++ objects and libs
 
 *.slo
