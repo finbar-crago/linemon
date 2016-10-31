@@ -24,25 +24,19 @@ int main(int argc, char **argv){
   run = 0;
   sip_init();
 
-  pjsua_acc_id acc_id = sip_register("172.28.128.3", "100", "pass");
-
+  pjsua_acc_id acc = sip_register("172.28.128.3", "100", "pass");
   port_init();
-
   while(!run){sleep(1);}
 
-
-  pj_str_t uri = pj_str("sip:**1@172.28.128.3");
-
-
-  pjsua_call_setting opt;
-  pjsua_call_setting_default(&opt);
-
-  pjsua_call_id call;
-  pjsua_call_make_call(acc_id, &uri, &opt, NULL, NULL, &call);
+  dial(acc, "sip:**1@172.28.128.3");
  
-  sleep(60);
+  while(run){sleep(1);}
+  pjsua_destroy();
+  close(tx_out);
+  close(rx_out);
   return 0;
 }
+
 
 void on_reg_state(pjsua_acc_id acc_id){
   pjsua_acc_info acc_info;
@@ -57,7 +51,9 @@ static void on_call_state(pjsua_call_id call_id, pjsip_event *e){
   pjsua_call_info ci;
   pjsua_call_get_info(call_id, &ci);
   if(ci.state == PJSIP_INV_STATE_CONNECTING){}
-  if(ci.state == PJSIP_INV_STATE_DISCONNECTED){}
+  if(ci.state == PJSIP_INV_STATE_DISCONNECTED){
+    run = 0;
+  }
 }
 
 static void on_call_media_state(pjsua_call_id call_id){
@@ -107,17 +103,16 @@ int sip_init(){
 
 
 pj_status_t get_frame(pjmedia_port *port, pjmedia_frame *frame){
-  if(frame->type != PJMEDIA_FRAME_TYPE_AUDIO)
+  if(tx_pos > BUFSIZE){
+    run = 0;
     return PJ_SUCCESS;
+  }
 
   int i = 0;
   char *buf = (char*)frame->buf;
   while(i < frame->size){
     buf[i++] = tx_buf[tx_pos++];
   }
-
-  if(tx_pos > BUFSIZE)
-    exit(0);
 
   return PJ_SUCCESS;
 }
@@ -170,6 +165,17 @@ int port_init(){
   return 1;
 }
 
+pjsua_call_id dial(pjsua_acc_id acc_id, char *to){
+  pj_str_t uri = pj_str(to);
+
+  pjsua_call_setting opt;
+  pjsua_call_setting_default(&opt);
+
+  pjsua_call_id call;
+  pjsua_call_make_call(acc_id, &uri, &opt, NULL, NULL, &call);
+
+  return call;
+}
 
 pjsua_acc_id sip_register(char *host, char *user, char *pass){
   pj_status_t pj_status;
