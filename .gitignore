@@ -5,6 +5,9 @@
 *.wav
 *.png
 
+.vagrant/
+linemon
+
 # C++ objects and libs
 
 *.slo

@@ -10,8 +10,6 @@ char *tx_buf, *rx_buf;
 FILE *tx_out, *rx_out;
 int   tx_pos,  rx_pos;
 
-#define CHECK(fn) puts(fn);
-
 #define DIE(fn) \
   { printf("[%s:%d(%s)] !%s\n",__FILE__,__LINE__,__PRETTY_FUNCTION__,#fn); \
     exit(-1); }
@@ -166,6 +164,7 @@ int port_init(){
   tx_buf = malloc(sizeof(char) * BUFSIZE);
   rx_buf = malloc(sizeof(char) * BUFSIZE);
 
+  //TODO: Replace with something more "voice" like...
   int t=0; while(t < BUFSIZE){
     tx_buf[t+0] = 0;
     tx_buf[t+1] = (t & (t * 16)) | t >> 7;
@@ -200,6 +199,7 @@ pjsua_call_id dial(pjsua_acc_id acc_id, char *host, char *extn){
   pjsua_call_id call;
   pjsua_call_make_call(acc_id, &uri, &opt, NULL, NULL, &call);
 
+  free(c_uri);
   return call;
 }
 
