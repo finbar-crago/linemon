@@ -13,7 +13,7 @@ exten => **2,1,Answer
 exten => **2,2,Milliwatt
 exten => **2,3,Hangup
 exten => _1XX,1,Answer
-exten => _1XX,2,Dial(SIP/\${EXTEN})
+exten => _1XX,2,Dial(SIP/\\${EXTEN})
 exten => _1XX,3,Hangup
 EOF
 cat <<EOF > /etc/asterisk/sip.conf
