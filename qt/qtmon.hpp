@@ -9,9 +9,15 @@ class MainWindow : public QWidget{ Q_OBJECT
 public:
   explicit MainWindow();
 
+signals:
+  void startCall(QString);
+
 private:
   QLineEdit *sip_url;
+  QPushButton *callBtn;
 
+private slots:
+  void clickBtn();
 };
 
 #endif
